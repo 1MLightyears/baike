@@ -56,8 +56,6 @@ class Baike(object):
         if url[0] == '/':
             url = 'https://baike.baidu.com' + url
         ret = rq.get(url, headers=self.header)
-        with open('ret.html', 'w', encoding='utf-8') as f:
-            f.write(ret.text)
         doc = html.fromstring(ret.text)
 
         #获取主标题，默认这个词条一定有主标题
