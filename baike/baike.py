@@ -1,20 +1,10 @@
 '''
-百毒百科bot
+百度百科bot
 by 百万光年(1MLightyears@gmail.com)
 
 搜索百度百科并返回匹配条目的简介。
 
-用法：二选一
-1.
-from baike import Baike
-ret=Baike('你要搜的内容').query()
-#返回结果保存在ret里
-
-2.
-from baike import getBaike
-ret=getBaike('你要搜的内容')
-#同上
-
+具体用法请查看README.md。
 '''
 
 import requests as rq
@@ -126,7 +116,7 @@ class Baike(object):
         ret = rq.get('https://baike.baidu.com/search?word=' + self.keyword,headers=self.header)
         ret.encoding='utf-8'
         doc = html.fromstring(ret.text)
-        x = "//div[@class='searchResult']/dl[1]/dd[1]/a"
+        x = "//div[@class='searchResult']/dl[1]/dd[1]/a[@class='result-title']"
         ans = doc.xpath(x)
         if ans == []:
             return ''  #搜索没有结果

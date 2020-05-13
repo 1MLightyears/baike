@@ -1,3 +1,8 @@
 *.html
+*.swp
+setup.py
 
 __pycache__/
+*.egg-info/
+dist/
+build/
