@@ -1,4 +1,4 @@
 from __future__ import absolute_import
-from baike import *
 
-name='baike'
+from .baike import Baike,getBaike
+

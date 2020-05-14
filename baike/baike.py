@@ -24,6 +24,7 @@ class Baike(object):
                       False:在接下来的搜索中，获取第一个匹配的词条的内容简介;
         no(int):当entries=True时，直接获取第n个词条的内容简介
         '''
+        self.keyword=''
         if keyword != None:
             self.keyword = keyword
         self.entries=entries
