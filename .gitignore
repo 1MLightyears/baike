@@ -1,6 +1,8 @@
 *.html
 *.swp
 setup.py
+*.sh
+baike/*.jpg
 
 __pycache__/
 *.egg-info/
