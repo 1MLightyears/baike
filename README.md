@@ -4,17 +4,15 @@
 
 ### 简介
 
-搜索百度百科并返回匹配条目的简介。
+搜索百度百科并返回匹配条目的简介，图片等。
 
 ------
 
 ### 安装
 
-```python
+```shell
 #pip install baike
 ```
-
-
 
 ------
 
@@ -25,16 +23,16 @@
 1.
 
 ```python
-from baike import Baike
-ret=Baike('你要搜的内容').query()
+>>>from baike import Baike
+>>>ret=Baike('你要搜的内容').query()
 #返回结果保存在ret里
 ```
 
 2.
 
 ```python
-from baike import getBaike
-ret=getBaike('你要搜的内容')
+>>>from baike import getBaike
+>>>ret=getBaike('你要搜的内容')
 #同上
 #也可以直接print(getBaike('你要搜的内容'))直接显示
 ```
