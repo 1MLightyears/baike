@@ -8,24 +8,26 @@ class Baike(object):
     '''
     主对象部分。进行百科搜索。
 
-    settings(self,keyword:str=None,no:int=1,timeout=5,pic:bool=False):
+    setting(self,keyword:str=None,no:int=1,timeout=5,pic:bool=False):
         对当前的搜索对象进行设置。
     query():以当前设置进行一次搜索。
     setting(keyword:str=None,no:int=1,timeout=5,pic:bool=False):
             设置参数。
     '''
     #private
-    def __init__(self, *args,**kwargs):
-        self.settings(*args,**kwargs)
+    def __init__(self, *args, **kwargs):
+        self.reset()
+        self.setting(*args,**kwargs)
 
     def __getSummaryPic(self, url: str):
         """
         保存某个义项的概要图。
         """
+        #先计算保存图片的编号值
         try:
             ir = rq.get(url, stream=True)
             if ir.status_code == 200:
-                with open(self.title+'_'+str(self.no)+'.'+url[-3:], 'wb') as f:
+                with open(self.title+'_'+str(self.__setup['no'])+'.'+url[-3:], 'wb') as f:
                     for chunk in ir:
                         f.write(chunk)
             return True#成功存图返回True
@@ -38,7 +40,7 @@ class Baike(object):
         获取词条的内容简介。
         """
         try:
-            ret = rq.get(url, headers=self.__header, timeout=self.timeout)
+            ret = rq.get(url, headers=self.__header, timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
             stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
             return ''
@@ -52,7 +54,7 @@ class Baike(object):
             self.subtitle='' #由于没有副标题的现象比较普遍，因此这里不考虑报错
 
         #获取summary图
-        if self.pic:
+        if self.__setup['pic']:
             img = doc.xpath("//div[@class='summary-pic']//img")
             if img != []:
                 self.__getSummaryPic(img[0].attrib['src'])
@@ -80,7 +82,7 @@ class Baike(object):
         获取义项列表。
         """
         try:
-            ret = rq.get(url, headers=self.__header,timeout=self.timeout)
+            ret = rq.get(url, headers=self.__header,timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
             stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
             return ''
@@ -90,30 +92,31 @@ class Baike(object):
         self.title=doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h1/text()")[0]
         #获取义项列表
         self.entrylist = doc.xpath("//ul[@class='polysemantList-wrapper cmn-clearfix']//li/*")
-        #如果义项列表是空的，说明这是个单义词，为它增加一个dummy义项"(这是一个单义词)"
+        #如果义项列表是空的，说明这是个单义词，为其添加标题
         if self.entrylist == []:
             self.entrylist=[html.HtmlElement()]
-            self.entrylist[0].text = '(这是一个单义词)'
+            self.entrylist[0].text = self.title
 
         #为能返回正确的url，对其他url添加头部
-        for i in range(1,len(self.entrylist)):
-             self.entrylist[i].attrib['href']="https://baike.baidu.com"+self.entrylist[i].attrib['href']
-        #为使得对于列表的访问逻辑更合理，增加对于1的处理
-        self.entrylist[0].attrib['href'] = url
+        for i in range(len(self.entrylist)):
+            if self.entrylist[i].attrib.has_key('href'):
+                self.entrylist[i].attrib['href'] = "https://baike.baidu.com" + self.entrylist[i].attrib['href']
+            else:
+                #没有href属性的是当前义项，为它加一个url
+                self.entrylist[i].attrib['href'] = url
+
         #对no进行处理
-        if self.no != 0:
-            if self.no > 0:
-                self.no -= 1
-            if self.no > len(self.entrylist)-1:
-                self.no = len(self.entrylist) - 1
-            elif self.no < -len(self.entrylist):
-                self.no = -len(self.entrylist)
+        if self.__setup['no'] != 0:
+            if self.__setup['no'] > len(self.entrylist):
+                self.__setup['no'] = len(self.entrylist)
+            elif self.__setup['no'] < -len(self.entrylist)+1:
+                self.__setup['no'] = -len(self.entrylist)+1
                 #处理完毕，no指向的entrylist一定有
-            return self.__getDescription(self.entrylist[self.no].attrib['href'])
-        elif self.no == 0:
-            #如果处理后的no是0那么说明要求显示义项列表
+            return self.__getDescription(self.entrylist[self.__setup['no']-1].attrib['href'])
+        elif self.__setup['no'] == 0:
+            #如果no是0那么说明要求显示义项列表
             entries = ''
-            self.title=self.keyword
+            self.title=self.__setup['keyword']
             for i in range(len(self.entrylist)):
                 entries += str(i+1)+':'+self.entrylist[i].text+'\n'
 
@@ -121,27 +124,32 @@ class Baike(object):
             text=self.title+'\n'+entries
             return text
 
+    def __call__(self, *args, **kwargs):
+        self.reset()
+        if self.setting(*args,**kwargs)==0:
+            return self.query()
+
     #public
     def query(self):
         '''
         搜索关键字
         '''
 
-        if self.keyword == None:
+        if self.setting() != 0:
             return ''
 
         # 获取搜索结果
         try:
-            ret = rq.get('https://baike.baidu.com/search?word=' + self.keyword,headers=self.__header,timeout=self.timeout)
+            ret = rq.get('https://baike.baidu.com/search?word=' + self.__setup['keyword'],headers=self.__header,timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
-            stderr.write('超时错误:' + 'https://baike.baidu.com/search?word=' + self.keyword + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
+            stderr.write('超时错误:' + 'https://baike.baidu.com/search?word=' + self.__setup['keyword'] + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
             return ''
         ret.encoding='utf-8'
         doc = html.fromstring(ret.text)
         x = "//div[@class='searchResult']/dl[1]/dd[1]/a[@class='result-title']"
         ans = doc.xpath(x)
         if ans == []:
-            stderr.write('没有匹配的搜索结果:'+self.keyword+'\n')
+            stderr.write('没有匹配的搜索结果:'+self.__setup['keyword']+'\n')
             return ''  #搜索没有结果
         url = ans[0].attrib['href']
         if url[0] == '/':
@@ -149,41 +157,45 @@ class Baike(object):
 
         return self.__getEntries(url)
 
-    def settings(self,keyword:str=None,no:int=1,timeout=5,pic:bool=False):
+    def setting(self,*args,**kwargs):
         '''
         初始化搜索关键字和header。
 
-        keyword(str):要搜索的关键字。默认为None是为了防止报错，这时返回空字符串。
+        keyword(str):要搜索的关键字。默认为None，这时返回空字符串。
         no(int):当no为整数时，获取第no个义项；
                 当no为0时，获取义项列表；
                 负数的no意味着从最后一个义项开始倒数。
                 默认为1。
         timeout(int):请求的超时限制。超时后会报错'超时错误'并返回空字符串。默认为5(秒)。
         pic(bool):是否下载简介图片。默认为False。
-        '''
 
+        如果设置合法，该函数返回0。如果设置不合法，该函数返回大于0的值，此时调用query()会报错。
+        '''
         #用户设置部分
+        for i, j in zip(self.__setup.keys(), args):
+            self.__setup[i] = j
+        self.__setup.update(kwargs)
+        #检查各变量是否合法
         #keyword
-        if keyword != None:
-            self.keyword = keyword
-        else:
-            self.keyword = ''
+        if not isinstance(self.__setup['keyword'],str):
+            stderr.write('参数不正确:keyword必须是字符串\n')
+            return 1
 
         #no
-        if isinstance(no,int):
-            self.no = no
-        else:
-            self.no = 1
+        if not isinstance(self.__setup['no'],int):
+            stderr.write('参数不正确:no必须是整数\n')
+            return 1
 
         #timeout
-        if timeout > 0:
-            self.timeout = timeout
-        else:
-            self.timeout = 5  #默认值
+        if self.__setup['timeout'] <= 0:
+            stderr.write('参数不正确:timeout必须大于0\n')
+            return 1
+
 
         #pic
-        self.pic = pic
-
+        if not isinstance(self.__setup['pic'],bool):
+            stderr.write('参数不正确:pic必须是True或False\n')
+            return 1
         ### 自动获取部分
         #header
         #暂时使用Firefox的header
@@ -203,9 +215,19 @@ class Baike(object):
         #description
         self.description = ''
 
-    def __call__(self,*args,**kwargs):
-        self.settings(*args,**kwargs)
-        return self.query()
+        return 0
+
+    def reset(self):
+        """
+        提供默认设置。
+        """
+        self.__setup = {
+            'keyword': '',
+            'no': 1,
+            'timeout': 5,
+            'pic':False
+            }
+
 
 #提供一个预先定义好的对象getBaike方便直接调用
 getBaike = Baike()
