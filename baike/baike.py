@@ -46,6 +46,8 @@ class Baike(object):
             return ''
         doc = html.fromstring(ret.text)
 
+        #获取主标题，如果前面的搜索有结果，那默认这个词条一定有主标题
+        self.title=doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h1/text()")[0]
         #如果有副标题，加上副标题
         self.subtitle = doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h2/text()")
         if self.subtitle != []:
@@ -88,8 +90,6 @@ class Baike(object):
             return ''
         doc = html.fromstring(ret.text)
 
-        #获取主标题，如果前面的搜索有结果，那默认这个词条一定有主标题
-        self.title=doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h1/text()")[0]
         #获取义项列表
         self.entrylist = doc.xpath("//ul[@class='polysemantList-wrapper cmn-clearfix']//li/*")
         #如果义项列表是空的，说明这是个单义词，为其添加标题
