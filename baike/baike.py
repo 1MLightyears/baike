@@ -23,11 +23,12 @@ class Baike(object):
         """
         保存某个义项的概要图。
         """
-        #先计算保存图片的编号值
+        #先获取到不带附加参数的url链接
+        url = re.search(r'^(.*?)\?', url).group(1)
         try:
             ir = rq.get(url, stream=True)
             if ir.status_code == 200:
-                with open(self.title+'_'+str(self.__setup['no'])+'.'+url[-3:], 'wb') as f:
+                with open(self.title + '_' + str(self.__setup['no']) + '.jpg', 'wb') as f:  #默认图片为jpg格式
                     for chunk in ir:
                         f.write(chunk)
             return True#成功存图返回True
@@ -59,7 +60,7 @@ class Baike(object):
         if self.__setup['pic']:
             img = doc.xpath("//div[@class='summary-pic']//img")
             if img != []:
-                self.__getSummaryPic(img[0].attrib['src'])
+                self.__getSummaryPic(img[0].attrib["src"])
 
         #获取description
         desclist = doc.xpath("//div[@class='lemma-summary']//text()")
