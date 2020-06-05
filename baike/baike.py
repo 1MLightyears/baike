@@ -1,7 +1,9 @@
-import requests as rq
-from lxml import html
 import re
 from sys import stderr
+from typing import List
+
+import requests as rq
+from lxml import html
 
 
 class Baike(object):
@@ -11,13 +13,35 @@ class Baike(object):
     setting(self,keyword:str=None,no:int=1,timeout=5,pic:bool=False):
         对当前的搜索对象进行设置。
     query():以当前设置进行一次搜索。
-    setting(keyword:str=None,no:int=1,timeout=5,pic:bool=False):
+    setting(keyword:str=None,no:List=[1,[0]],timeout=5,pic:bool=False):
             设置参数。
     '''
     #private
     def __init__(self, *args, **kwargs):
         self.reset()
         self.setting(*args,**kwargs)
+
+    def __regularize(self,i:int,j:int):
+        """
+        将i规范到-j~j-1之间，以便于列表索引。
+        """
+        if i >= j:
+            i=j-1
+        elif i<-j:
+            i=-j
+        return i
+
+    def __getTitles(self, doc):
+        """
+        获取主副标题。
+        doc(lxml.html):需要获取标题的页面
+        """
+        self.title=doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h1/text()")[0]
+        self.subtitle = doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h2/text()")
+        if self.subtitle != []:
+            self.subtitle = self.subtitle[0]
+        else:
+            self.subtitle=''
 
     def __getSummaryPic(self, url: str):
         """
@@ -36,10 +60,11 @@ class Baike(object):
             stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ir.status_code)+'\n')
             return False#存图失败返回False
 
-    def __getDescription(self, url: str):
+    def __getParagraph(self, url: str):
         """
         获取词条的内容简介。
         """
+        endl='ANewLine'
         try:
             ret = rq.get(url, headers=self.__header, timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
@@ -47,14 +72,8 @@ class Baike(object):
             return ''
         doc = html.fromstring(ret.text)
 
-        #获取主标题，如果前面的搜索有结果，那默认这个词条一定有主标题
-        self.title=doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h1/text()")[0]
-        #如果有副标题，加上副标题
-        self.subtitle = doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h2/text()")
-        if self.subtitle != []:
-            self.subtitle = self.subtitle[0]
-        else:
-            self.subtitle='' #由于没有副标题的现象比较普遍，因此这里不考虑报错
+        #换了一个新页面，重新获取一次标题副标题
+        self.__getTitles(doc)
 
         #获取summary图
         if self.__setup['pic']:
@@ -62,23 +81,50 @@ class Baike(object):
             if img != []:
                 self.__getSummaryPic(img[0].attrib["src"])
 
-        #获取description
-        desclist = doc.xpath("//div[@class='lemma-summary']//text()")
-        self.description=''
-        for s in desclist:
-            self.description += s
+        self.text = ''
+
+        #如果no的第二个参数是空列表，那么显示段落目录
+        if self.__setup['no'][1] == []:
+            self.text='【目录】'+endl+'0简介'+endl
+            index = doc.xpath("//dt[@class='catalog-title level1']")
+            for item in index:
+                self.text+=item.text_content()+endl
+
+
+        #处理词条文本，分成段落
+        paralist = []
+        divlist = doc.xpath("//div[@class='main-content']/div")
+        for div in divlist:
+            if 'lemma-summary' in list(div.attrib.values()):#是简介部分
+                paralist.append(div.text_content())
+            elif 'para-title level-2' in list(div.attrib.values()):
+                paralist.append(str(len(paralist))+'.')#一个段落的标题
+                for t in div.getchildren()[0].itertext():
+                    #段落标题是一个<h2>，这个标签底下有一个<span>会影响分切出的段落标题，因此需要过滤掉
+                    #这个<span>，它的text和页面标题一致。
+                    if t != self.title:
+                        paralist[len(paralist)-1]+=t+' '#拼接出适合阅读的标题
+            elif ('para' in list(div.attrib.values()))and('style'not in list(div.attrib)):#前一个段落的内容,且不是图片
+                paralist[len(paralist) - 1] += endl+div.text_content()#添加内容到列表的最后一个里
+            elif 'album-list' in list(div.attrib.values()):#内容结束
+                break
+
+        #选出对应片段
+        for i in self.__setup['no'][1]:
+            self.text+=paralist[self.__regularize(i,len(paralist))]+endl
 
         #对description进行后期处理
         #删去\xa0
-        self.description = re.sub(r'\xa0', '', self.description)
+        self.text = re.sub(r'\xa0', '', self.text)
         #删去角标部分
-        self.description = re.sub(r'\[[0-9\-]*?\]', '', self.description)
+        self.text = re.sub(r'\[[0-9\-]*?\]', '', self.text)
         #删去换行符
-        self.description = re.sub(r'[\n\r]', '', self.description)
+        self.text = re.sub(r'[\n\r]', '', self.text)
+        #把换行标记ANewLine变成\n
+        self.text = re.sub(endl,'\n', self.text)
 
         #处理完毕，拼接结果
-        text=self.title+self.subtitle+'\n'+self.description
-        return text
+        return self.title+self.subtitle+'\n'+self.text
 
     def __getEntries(self, url: str):
         """
@@ -91,12 +137,17 @@ class Baike(object):
             return ''
         doc = html.fromstring(ret.text)
 
+        #现在我们在第一个义项页面里
+        self.__getTitles(doc)
+
         #获取义项列表
         self.entrylist = doc.xpath("//ul[@class='polysemantList-wrapper cmn-clearfix']//li/*")
         #如果义项列表是空的，说明这是个单义词，为其添加标题
         if self.entrylist == []:
             self.entrylist=[html.HtmlElement()]
-            self.entrylist[0].text = self.title
+            self.entrylist[0].text = self.title + '\n' + self.subtitle
+        #为使得第i个索引指向第i个义项，需要添加一个dummy0号义项在entrylist里
+        self.entrylist = [html.HtmlElement()] + self.entrylist
 
         #为能返回正确的url，对其他url添加头部
         for i in range(len(self.entrylist)):
@@ -107,23 +158,21 @@ class Baike(object):
                 self.entrylist[i].attrib['href'] = url
 
         #对no进行处理
-        if self.__setup['no'] != 0:
-            if self.__setup['no'] > len(self.entrylist):
-                self.__setup['no'] = len(self.entrylist)
-            elif self.__setup['no'] < -len(self.entrylist)+1:
-                self.__setup['no'] = -len(self.entrylist)+1
-                #处理完毕，no指向的entrylist一定有
-            return self.__getDescription(self.entrylist[self.__setup['no']-1].attrib['href'])
-        elif self.__setup['no'] == 0:
+        #如果no不是列表，把它变成列表
+        if isinstance(self.__setup['no'], int):
+            self.__setup['no'] = [self.__setup['no'], 1]
+        #获取第no[0]号义项的内容
+        if self.__setup['no'][0] != 0:
+            return self.__getParagraph(self.entrylist[self.__regularize(self.__setup['no'][0],len(self.entrylist))].attrib['href'])
+        elif self.__setup['no'][0] == 0:
             #如果no是0那么说明要求显示义项列表
             entries = ''
             self.title=self.__setup['keyword']
-            for i in range(len(self.entrylist)):
-                entries += str(i+1)+':'+self.entrylist[i].text+'\n'
+            for i in range(1,len(self.entrylist)):
+                entries += str(i)+':'+self.entrylist[i].text+'\n'
 
             #处理完毕，拼接结果
-            text=self.title+'\n'+entries
-            return text
+            return self.title+'\n'+entries
 
     def __call__(self, *args, **kwargs):
         self.reset()
@@ -160,13 +209,19 @@ class Baike(object):
 
     def setting(self,*args,**kwargs):
         '''
-        初始化搜索关键字和header。
+        设置搜索关键字和header。
 
         keyword(str):要搜索的关键字。默认为None，这时返回空字符串。
-        no(int):当no为整数时，获取第no个义项；
-                当no为0时，获取义项列表；
-                负数的no意味着从最后一个义项开始倒数。
-                默认为1。
+        no(List of int):第一个参数：整数no1。
+                            为整数时，获取第no1个义项；
+                            为0时，获取义项列表；
+                            负数的no1意味着从最后一个义项开始倒数。
+                            默认为1。
+                        第二个参数：列表no2.
+                            为空(“[]”)时，获取目录；
+                            为0时，获取简介段落；
+                            为整数时，依次获取各段落并拼接。
+                            默认为[0]。
         timeout(int):请求的超时限制。超时后会报错'超时错误'并返回空字符串。默认为5(秒)。
         pic(bool):是否下载简介图片。默认为False。
 
@@ -183,8 +238,8 @@ class Baike(object):
             return 1
 
         #no
-        if not isinstance(self.__setup['no'],int):
-            stderr.write('参数不正确:no必须是整数\n')
+        if not (isinstance(self.__setup['no'], int) or (isinstance(self.__setup['no'], List)and(isinstance(self.__setup['no'][0],int))and([i for i in self.__setup['no'][1] if not isinstance(i,int)]==[]))):
+            stderr.write('参数不正确:no必须是整数或列表\n')    #no是列表                                 #列表部分里没有一个元素不是整数（no里的每个元素都是整数）
             return 1
 
         #timeout
@@ -214,7 +269,7 @@ class Baike(object):
         self.subtitle = ''
 
         #description
-        self.description = ''
+        self.text = ''
 
         return 0
 
@@ -224,7 +279,7 @@ class Baike(object):
         """
         self.__setup = {
             'keyword': '',
-            'no': 1,
+            'no': [1,[0]],
             'timeout': 5,
             'pic':False
             }
