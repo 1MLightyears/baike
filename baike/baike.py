@@ -1,6 +1,7 @@
 import re
 from sys import stderr
 from typing import List
+from os.path import exists
 
 import requests as rq
 from lxml import html
@@ -51,10 +52,12 @@ class Baike(object):
         url = re.search(r'^(.*?)\?', url).group(1)
         try:
             ir = rq.get(url, stream=True)
-            if ir.status_code == 200:
-                with open(self.title + '_' + str(self.__setup['no']) + '.jpg', 'wb') as f:  #默认图片为jpg格式
-                    for chunk in ir:
-                        f.write(chunk)
+            picpath = self.title + '_' + str(self.__setup['no'][0]) + '.jpg'
+            if not exists(picpath):
+                if ir.status_code == 200:
+                    with open(picpath, 'wb') as f:  #默认图片为jpg格式
+                        for chunk in ir:
+                            f.write(chunk)
             return True#成功存图返回True
         except rq.exceptions.Timeout:
             stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ir.status_code)+'\n')
