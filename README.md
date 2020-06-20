@@ -2,6 +2,8 @@
 
 # 百度百科bot
 
+![Upload Python Package](https://github.com/1MLightyears/baike/workflows/Upload%20Python%20Package/badge.svg)
+
 ### 简介
 
 搜索百度百科并返回匹配条目的简介，图片等。
