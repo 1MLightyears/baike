@@ -179,8 +179,11 @@ class Baike(object):
 
     def __call__(self, *args, **kwargs):
         self.reset()
-        if self.setting(*args,**kwargs)==0:
+        ret = self.setting(*args, **kwargs)
+        if ret==0:
             return self.query()
+        else:
+            return ''
 
     #public
     def query(self):
@@ -241,20 +244,26 @@ class Baike(object):
             return 1
 
         #no
-        if not (isinstance(self.__setup['no'], int) or (isinstance(self.__setup['no'], List)and(isinstance(self.__setup['no'][0],int))and([i for i in self.__setup['no'][1] if not isinstance(i,int)]==[]))):
-            stderr.write('参数不正确:no必须是整数或列表\n')    #no是列表                                 #列表部分里没有一个元素不是整数（no里的每个元素都是整数）
-            return 1
+        if not (isinstance(self.__setup['no'], int) or  #是单个整数
+            (isinstance(self.__setup['no'], List) and  #或者是列表
+            (len(self.__setup['no']) > 1) and  #这个列表至少两个元素
+            (isinstance(self.__setup['no'][0], int)) and  #第一个元素是"义项序号"
+            (isinstance(self.__setup['no'][1], List))and  #第二个元素是"段落列表"
+            ([i for i in self.__setup['no'][1] if not isinstance(i, int)] == []))):  #段落列表中每个元素都是整数
+
+            stderr.write('参数不正确:no必须是整数或描述段落的列表\n')    #no是列表                                 #列表部分里没有一个元素不是整数（no里的每个元素都是整数）
+            return 2
 
         #timeout
         if self.__setup['timeout'] <= 0:
             stderr.write('参数不正确:timeout必须大于0\n')
-            return 1
+            return 3
 
 
         #pic
         if not isinstance(self.__setup['pic'],bool):
             stderr.write('参数不正确:pic必须是True或False\n')
-            return 1
+            return 4
         ### 自动获取部分
         #header
         #暂时使用Firefox的header
