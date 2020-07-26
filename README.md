@@ -2,7 +2,7 @@
 
 # 百度百科bot
 
-![Upload Python Package](https://github.com/1MLightyears/baike/workflows/Upload%20Python%20Package/badge.svg)
+![PyPI](https://img.shields.io/pypi/v/baike?style=plastic)![PyPI - Python Version](https://img.shields.io/pypi/pyversions/baike?style=plastic)
 
 ### 简介
 
@@ -175,6 +175,8 @@
 ```
 
 Python 3.6.9 3.7.1 正常运行。在Termux上安装lxml可能存在问题。
+
+baike仍处于pre-Alpha阶段，建议随时使用最新版以减少bug。
 
 ------
 

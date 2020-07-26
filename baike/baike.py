@@ -7,7 +7,7 @@ import requests as rq
 from lxml import html
 
 
-class Baike(object):
+class Baike():
     '''
     主对象部分。进行百科搜索。
 
@@ -22,7 +22,7 @@ class Baike(object):
         self.reset()
         self.setting(*args,**kwargs)
 
-    def __regularize(self,i:int,j:int):
+    def __regularize(self, i: int, j: int):
         """
         将i规范到-j~j-1之间，以便于列表索引。
         """
@@ -161,14 +161,17 @@ class Baike(object):
                 self.entrylist[i].attrib['href'] = url
 
         #对no进行处理
-        #如果no不是列表，把它变成列表
+        #如果no是单个整数，把它变成列表
         if isinstance(self.__setup['no'], int):
-            self.__setup['no'] = [self.__setup['no'], 1]
+            self.__setup['no'] = [self.__setup['no'], [0]]
+        #如果no是只有一个元素的列表，加上段落默认值[0]
+        elif len(self.__setup['no']) == 1:
+            self.__setup['no'].append([0])
         #获取第no[0]号义项的内容
         if self.__setup['no'][0] != 0:
             return self.__getParagraph(self.entrylist[self.__regularize(self.__setup['no'][0],len(self.entrylist))].attrib['href'])
         elif self.__setup['no'][0] == 0:
-            #如果no是0那么说明要求显示义项列表
+            #如果no[0]是0那么说明要求显示义项列表
             entries = ''
             self.title=self.__setup['keyword']
             for i in range(1,len(self.entrylist)):
@@ -188,7 +191,7 @@ class Baike(object):
     #public
     def query(self):
         '''
-        搜索关键字
+        搜索关键字。
         '''
 
         if self.setting() != 0:
@@ -244,14 +247,13 @@ class Baike(object):
             return 1
 
         #no
-        if not (isinstance(self.__setup['no'], int) or  #是单个整数
+        if not ((isinstance(self.__setup['no'], int) or  #是单个整数
             (isinstance(self.__setup['no'], List) and  #或者是列表
-            (len(self.__setup['no']) > 1) and  #这个列表至少两个元素
             (isinstance(self.__setup['no'][0], int)) and  #第一个元素是"义项序号"
             (isinstance(self.__setup['no'][1], List))and  #第二个元素是"段落列表"
-            ([i for i in self.__setup['no'][1] if not isinstance(i, int)] == []))):  #段落列表中每个元素都是整数
+            ([i for i in self.__setup['no'][1] if not isinstance(i, int)] == [])))):#段落列表中每个元素都是整数
 
-            stderr.write('参数不正确:no必须是整数或描述段落的列表\n')    #no是列表                                 #列表部分里没有一个元素不是整数（no里的每个元素都是整数）
+            stderr.write('参数不正确:no必须是整数或描述段落的列表\n')
             return 2
 
         #timeout

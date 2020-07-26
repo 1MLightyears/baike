@@ -6,7 +6,7 @@ with open("README.md","r",encoding="utf-8") as fh:
 setuptools.setup(
         name="baike",
         license="Apache 2.0",
-        version="1.3.2",
+        version="1.3.3",
         author="Lightyears",
         author_email="1MLightyears@gmail.com",
         description="BaiduBaike search bot",
@@ -14,7 +14,8 @@ setuptools.setup(
         long_description_content_type="text/markdown",
         url='https://github.com/1MLightyears/baike',
         classifiers=[
-            "Programming Language :: Python :: 3",
+            "Programming Language :: Python :: 3.6",
+            "Programming Language :: Python :: 3.7",
             "Operating System :: OS Independent",
             "Development Status :: 2 - Pre-Alpha",
             "License :: OSI Approved :: Apache Software License",
