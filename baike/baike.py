@@ -17,15 +17,11 @@ class Baike():
     setting(keyword:str="",no:List=[1,[0]],timeout=5,pic:bool=False):
             设置参数。
     '''
-    __setup = {
-            'keyword': '',
-            'no': [1,[0]],
-            'timeout': 5,
-            'pic':False
-            }
+
 
     #private
     def __init__(self, *args, **kwargs):
+        self.reset()
         self.setting(*args,**kwargs)
 
     def __regularize(self, i: int, j: int):
@@ -58,10 +54,10 @@ class Baike():
         url = re.search(r'^(.*?)\?', url).group(1)
         try:
             ir = rq.get(url, stream=True)
-            picpath = self.title + '_' + str(Baike.__setup['no'][0]) + '.jpg'
-            if not exists(picpath):
+            pic_path = self.title + '_' + str(self.__setup['no'][0]) + '.jpg'
+            if not exists(pic_path):
                 if ir.status_code == 200:
-                    with open(picpath, 'wb') as f:  #默认图片为jpg格式
+                    with open(pic_path, 'wb') as f:  #默认图片为jpg格式
                         for chunk in ir:
                             f.write(chunk)
             return True#成功存图返回True
@@ -75,7 +71,7 @@ class Baike():
         """
         endl='ANewLine'
         try:
-            ret = rq.get(url, headers=self.__header, timeout=Baike.__setup['timeout'])
+            ret = rq.get(url, headers=self.__header, timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
             stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
             return ''
@@ -85,7 +81,7 @@ class Baike():
         self.__getTitles(doc)
 
         #获取summary图
-        if Baike.__setup['pic']:
+        if self.__setup['pic']:
             img = doc.xpath("//div[@class='summary-pic']//img")
             if img != []:
                 self.__getSummaryPic(img[0].attrib["src"])
@@ -93,45 +89,42 @@ class Baike():
         self.text = ''
 
         #如果no的第二个参数是空列表，那么显示段落目录
-        if Baike.__setup['no'][1] == []:
+        if self.__setup['no'][1] == []:
             self.text='【目录】'+endl+'0简介'+endl
             index = doc.xpath("//dt[@class='catalog-title level1']")
             for item in index:
                 self.text+=item.text_content()+endl
 
         #处理词条文本，分成段落
-        paralist = []
+        para_list = []
         #某些带头部海报的页面，简介单独放置，因此需要单独选出
-        posttitle = doc.xpath("//body/div[3]")
-        if posttitle != []:
-            if posttitle[0].attrib["class"] != "body-wrapper":
-                paralist.append(posttitle[0].xpath(".//div[@class='lemma-summary']")[0].text_content())
-        divlist = doc.xpath("//div[@class='main-content']/div")
+        post_title = doc.xpath("//body/div[3]")
+        if post_title != []:
+            if post_title[0].attrib["class"] != "body-wrapper":
+                para_list.append(post_title[0].xpath(".//div[@class='lemma-summary']")[0].text_content())
+        div_list = doc.xpath("//div[@class='main-content']/div")
         #某些页面的结构有所不同：比如某些电影页面，其主要内容多一个div warp
-        with open('ret.html', 'w', encoding="utf-8") as f:
-            f.write(ret.text)
-
-        listcheck=[i for i in divlist if ("class" in i.attrib.keys())and("main_tab" in i.attrib["class"])]
-        if listcheck!= []:
-            divlist = listcheck[0].xpath("./div")
-        for div in divlist:
+        list_check=[i for i in div_list if ("class" in i.attrib.keys())and("main_tab" in i.attrib["class"])]
+        if list_check!= []:
+            div_list = list_check[0].xpath("./div")
+        for div in div_list:
             if 'lemma-summary' in list(div.attrib.values()):#是简介部分
-                paralist.append(div.text_content())
+                para_list.append(div.text_content())
             elif 'para-title level-2' in list(div.attrib.values()):
-                paralist.append(str(len(paralist))+'.')#一个段落的标题
+                para_list.append(str(len(para_list))+'.')#一个段落的标题
                 for t in div.getchildren()[0].itertext():
                     #段落标题是一个<h2>，这个标签底下有一个<span>会影响分切出的段落标题，因此需要过滤掉
                     #这个<span>，它的text和页面标题一致。
                     if t != self.title:
-                        paralist[len(paralist)-1]+=t+' '#拼接出适合阅读的标题
+                        para_list[len(para_list)-1]+=t+' '#拼接出适合阅读的标题
             elif ('para' in list(div.attrib.values()))and('style' not in list(div.attrib)):#前一个段落的内容,且不是图片
-                paralist[len(paralist) - 1] += endl+div.text_content()#添加内容到列表的最后一个里
+                para_list[len(para_list) - 1] += endl+div.text_content()#添加内容到列表的最后一个里
             elif 'album-list' in list(div.attrib.values()):#内容结束
                 break
 
         #选出对应片段
-        for i in Baike.__setup['no'][1]:
-            self.text+=paralist[self.__regularize(i,len(paralist))]+endl
+        for i in self.__setup['no'][1]:
+            self.text+=para_list[self.__regularize(i,len(para_list))]+endl
 
         #对description进行后期处理
         #删去\xa0
@@ -151,7 +144,7 @@ class Baike():
         获取义项列表。
         """
         try:
-            ret = rq.get(url, headers=self.__header,timeout=Baike.__setup['timeout'])
+            ret = rq.get(url, headers=self.__header,timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
             stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
             return ''
@@ -179,15 +172,15 @@ class Baike():
 
         #对no进行处理
         #如果no是单个整数，把它变成列表
-        if isinstance(Baike.__setup['no'], int):
-            Baike.__setup['no'] = [Baike.__setup['no'], [0]]
+        if isinstance(self.__setup['no'], int):
+            self.__setup['no'] = [self.__setup['no'], [0]]
         #获取第no[0]号义项的内容
-        if Baike.__setup['no'][0] != 0:
-            return self.__getParagraph(self.entrylist[self.__regularize(Baike.__setup['no'][0],len(self.entrylist))].attrib['href'])
-        elif Baike.__setup['no'][0] == 0:
+        if self.__setup['no'][0] != 0:
+            return self.__getParagraph(self.entrylist[self.__regularize(self.__setup['no'][0],len(self.entrylist))].attrib['href'])
+        elif self.__setup['no'][0] == 0:
             #如果no[0]是0那么说明要求显示义项列表
             entries = ''
-            self.title=Baike.__setup['keyword']
+            self.title=self.__setup['keyword']
             for i in range(1,len(self.entrylist)):
                 entries += str(i)+':'+self.entrylist[i].text+'\n'
 
@@ -212,16 +205,16 @@ class Baike():
 
         # 获取搜索结果
         try:
-            ret = rq.get('https://baike.baidu.com/search?word=' + Baike.__setup['keyword'],headers=self.__header,timeout=Baike.__setup['timeout'])
+            ret = rq.get('https://baike.baidu.com/search?word=' + self.__setup['keyword'],headers=self.__header,timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
-            stderr.write('超时错误:' + 'https://baike.baidu.com/search?word=' + Baike.__setup['keyword'] + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
+            stderr.write('超时错误:' + 'https://baike.baidu.com/search?word=' + self.__setup['keyword'] + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
             return ''
         ret.encoding='utf-8'
         doc = html.fromstring(ret.text)
         x = "//div[@class='searchResult']/dl[1]/dd[1]/a[@class='result-title']"
         ans = doc.xpath(x)
         if ans == []:
-            stderr.write('没有匹配的搜索结果:'+Baike.__setup['keyword']+'\n')
+            stderr.write('没有匹配的搜索结果:'+self.__setup['keyword']+'\n')
             return ''
         url = ans[0].attrib['href']
         if url[0] == '/':
@@ -250,34 +243,34 @@ class Baike():
         如果设置合法，该函数返回0。如果设置不合法，该函数返回大于0的值，此时调用query()会报错。
         '''
         #用户设置部分
-        for i, j in zip(Baike.__setup.keys(), args):
-            Baike.__setup[i] = j
-        Baike.__setup.update(kwargs)
+        for i, j in zip(self.__setup.keys(), args):
+            self.__setup[i] = j
+        self.__setup.update(kwargs)
         #检查各变量是否合法
         #keyword
-        if not isinstance(Baike.__setup['keyword'],str):
+        if not isinstance(self.__setup['keyword'],str):
             stderr.write('参数不正确:keyword必须是字符串\n')
             return 1
 
         #no
-        if not ((isinstance(Baike.__setup['no'], int) or
-            (isinstance(Baike.__setup['no'], List) and
-            (len(Baike.__setup['no'])==2) and
-            (isinstance(Baike.__setup['no'][0], int)) and
-            (isinstance(Baike.__setup['no'][1], List))and
-            ([i for i in Baike.__setup['no'][1] if not isinstance(i, int)] == [])))):
+        if not ((isinstance(self.__setup['no'], int) or
+            (isinstance(self.__setup['no'], List) and
+            (len(self.__setup['no'])==2) and
+            (isinstance(self.__setup['no'][0], int)) and
+            (isinstance(self.__setup['no'][1], List))and
+            ([i for i in self.__setup['no'][1] if not isinstance(i, int)] == [])))):
 
             stderr.write('参数不正确:no必须是整数或描述段落的列表\n')
             return 2
 
         #timeout
-        if Baike.__setup['timeout'] <= 0:
+        if self.__setup['timeout'] <= 0:
             stderr.write('参数不正确:timeout必须大于0\n')
             return 3
 
 
         #pic
-        if not isinstance(Baike.__setup['pic'],bool):
+        if not isinstance(self.__setup['pic'],bool):
             stderr.write('参数不正确:pic必须是True或False\n')
             return 4
         #自动获取部分
@@ -298,6 +291,15 @@ class Baike():
 
         return 0
 
+    def reset(self):
+        self.__setup = {
+            'keyword': '',
+            'no': [1,[0]],
+            'timeout': 5,
+            'pic':False
+            }
+
 
 #提供一个预先定义好的对象getBaike方便直接调用
-getBaike = Baike()
+def getBaike(*args, **kwargs):
+    return Baike()(*args,**kwargs)

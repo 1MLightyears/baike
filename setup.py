@@ -6,7 +6,7 @@ with open("README.md","r",encoding="utf-8") as fh:
 setuptools.setup(
         name="baike",
         license="Apache 2.0",
-        version="1.3.3",
+        version="1.4.1",
         author="Lightyears",
         author_email="1MLightyears@gmail.com",
         description="BaiduBaike search bot",
