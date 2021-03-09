@@ -1,12 +1,14 @@
 [TOC]
 
-# 百度百科bot
+# baike
 
 ![PyPI](https://img.shields.io/pypi/v/baike?style=plastic)![PyPI - Python Version](https://img.shields.io/pypi/pyversions/baike?style=plastic)
 
 ### 简介
 
-搜索百度百科并返回匹配条目的简介，图片等。
+baike是一个百度百科search bot。
+
+在百度百科上搜索词条并返回匹配条目的简介，图片等。
 
 ------
 
