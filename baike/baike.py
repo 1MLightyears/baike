@@ -10,28 +10,21 @@ from lxml import html
 class Baike():
     '''
     主对象部分。进行百科搜索。
-
-    setting(self,keyword:str="",no:List=[1,[0]],timeout=5,pic:bool=False):
-        对当前的搜索对象进行设置。
-    query():以当前设置进行一次搜索。
-    setting(keyword:str="",no:List=[1,[0]],timeout=5,pic:bool=False):
-            设置参数。
     '''
-
 
     #private
     def __init__(self, *args, **kwargs):
         self.reset()
-        self.setting(*args,**kwargs)
+        self.setting(*args, **kwargs)
 
     def __regularize(self, i: int, j: int):
         """
         将i规范到-j~j-1之间，以便于列表索引。
         """
         if i >= j:
-            i=j-1
-        elif i<-j:
-            i=-j
+            i = j - 1
+        elif i < -j:
+            i = -j
         return i
 
     def __getTitles(self, doc):
@@ -39,12 +32,15 @@ class Baike():
         获取主副标题。
         doc(lxml.html):需要获取标题的页面
         """
-        self.title=doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h1/text()")[0]
-        self.subtitle = doc.xpath("//dd[@class='lemmaWgt-lemmaTitle-title']/h2/text()")
+        self.title = doc.xpath(
+            "//dd[@class='lemmaWgt-lemmaTitle-title J-lemma-title']/h1/text()"
+        )[0]
+        self.subtitle = doc.xpath(
+            "//dd[@class='lemmaWgt-lemmaTitle-title J-lemma-title']/h2/text()")
         if self.subtitle != []:
             self.subtitle = self.subtitle[0]
         else:
-            self.subtitle=''
+            self.subtitle = ''
 
     def __getSummaryPic(self, url: str):
         """
@@ -60,20 +56,24 @@ class Baike():
                     with open(pic_path, 'wb') as f:  #默认图片为jpg格式
                         for chunk in ir:
                             f.write(chunk)
-            return True#成功存图返回True
+            return True  #成功存图返回True
         except rq.exceptions.Timeout:
-            stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ir.status_code)+'\n')
-            return False#存图失败返回False
+            stderr.write('超时错误:' + url + ';' + 'HTTP状态码:' +
+                         str(ir.status_code) + '\n')
+            return False  #存图失败返回False
 
     def __getParagraph(self, url: str):
         """
         获取词条的内容简介。
         """
-        endl='ANewLine'
+        endl = 'ANewLine'
         try:
-            ret = rq.get(url, headers=self.__header, timeout=self.__setup['timeout'])
+            ret = rq.get(url,
+                         headers=self.__header,
+                         timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
-            stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
+            stderr.write('超时错误:' + url + ';' + 'HTTP状态码:' +
+                         str(ret.status_code) + '\n')
             return ''
         doc = html.fromstring(ret.text)
 
@@ -90,41 +90,55 @@ class Baike():
 
         #如果no的第二个参数是空列表，那么显示段落目录
         if self.__setup['no'][1] == []:
-            self.text='【目录】'+endl+'0简介'+endl
+            self.text = '【目录】' + endl + '0简介' + endl
             index = doc.xpath("//dt[@class='catalog-title level1']")
             for item in index:
-                self.text+=item.text_content()+endl
+                self.text += item.text_content() + endl
 
+        print(self.__setup)
         #处理词条文本，分成段落
         para_list = []
         #某些带头部海报的页面，简介单独放置，因此需要单独选出
         post_title = doc.xpath("//body/div[3]")
         if post_title != []:
             if post_title[0].attrib["class"] != "body-wrapper":
-                para_list.append(post_title[0].xpath(".//div[@class='lemma-summary']")[0].text_content())
-        div_list = doc.xpath("//div[@class='main-content']/div")
+                para_list.append(post_title[0].xpath(
+                    ".//div[@class='lemma-summary']")[0].text_content())
+        div_list = doc.xpath("//div[@class='content']/div/div")
         #某些页面的结构有所不同：比如某些电影页面，其主要内容多一个div warp
-        list_check=[i for i in div_list if ("class" in i.attrib.keys())and("main_tab" in i.attrib["class"])]
-        if list_check!= []:
+        list_check = [
+            i for i in div_list if ("class" in i.attrib.keys()) and (
+                "main_tab" in i.attrib["class"])
+        ]
+        if list_check != []:
             div_list = list_check[0].xpath("./div")
         for div in div_list:
-            if 'lemma-summary' in list(div.attrib.values()):#是简介部分
+            attrib_class = div.attrib.get("class", "")
+            if not attrib_class:
+                continue
+            elif 'lemma-summary' in attrib_class:
+                #是简介部分
                 para_list.append(div.text_content())
-            elif 'para-title level-2' in list(div.attrib.values()):
-                para_list.append(str(len(para_list))+'.')#一个段落的标题
+            elif 'level-2' in attrib_class:
+                #一个段落的标题
+                para_list.append(f"{len(para_list)}.")
                 for t in div.getchildren()[0].itertext():
-                    #段落标题是一个<h2>，这个标签底下有一个<span>会影响分切出的段落标题，因此需要过滤掉
-                    #这个<span>，它的text和页面标题一致。
+                    #段落标题是一个<h2>，这个标签底下有一个<span>会影响分切出的
+                    #段落标题，因此需要过滤掉这个<span>，它的text和页面标题一致。
+                    #拼接出适合阅读的标题
                     if t != self.title:
-                        para_list[len(para_list)-1]+=t+' '#拼接出适合阅读的标题
-            elif ('para' in list(div.attrib.values()))and('style' not in list(div.attrib)):#前一个段落的内容,且不是图片
-                para_list[len(para_list) - 1] += endl+div.text_content()#添加内容到列表的最后一个里
-            elif 'album-list' in list(div.attrib.values()):#内容结束
+                        para_list[len(para_list) - 1] += t + ' '
+            elif ("para" in attrib_class) and \
+                 ("style" not in attrib_class):
+                #前一个段落的内容,且不是图片,添加内容到列表的最后一个里
+                para_list[len(para_list) - 1] += endl + div.text_content()
+            elif 'album-list' in attrib_class:
+                #内容结束
                 break
 
         #选出对应片段
         for i in self.__setup['no'][1]:
-            self.text+=para_list[self.__regularize(i,len(para_list))]+endl
+            self.text += para_list[self.__regularize(i, len(para_list))] + endl
 
         #对description进行后期处理
         #删去\xa0
@@ -134,19 +148,22 @@ class Baike():
         #删去换行符
         self.text = re.sub(r'[\n\r]', '', self.text)
         #把换行标记ANewLine变成\n
-        self.text = re.sub(endl,'\n', self.text)
+        self.text = re.sub(endl, '\n', self.text)
 
         #处理完毕，拼接结果
-        return self.title+self.subtitle+'\n'+self.text
+        return self.title + self.subtitle + '\n' + self.text
 
     def __getEntries(self, url: str):
         """
         获取义项列表。
         """
         try:
-            ret = rq.get(url, headers=self.__header,timeout=self.__setup['timeout'])
+            ret = rq.get(url,
+                         headers=self.__header,
+                         timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
-            stderr.write('超时错误:' + url + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
+            stderr.write('超时错误:' + url + ';' + 'HTTP状态码:' +
+                         str(ret.status_code) + '\n')
             return ''
         doc = html.fromstring(ret.text)
 
@@ -154,10 +171,11 @@ class Baike():
         self.__getTitles(doc)
 
         #获取义项列表
-        self.entrylist = doc.xpath("//ul[@class='polysemantList-wrapper cmn-clearfix']//li/*")
+        self.entrylist = doc.xpath(
+            "//ul[@class='polysemantList-wrapper cmn-clearfix']//li/*")
         #如果义项列表是空的，说明这是个单义词，为其添加标题
         if self.entrylist == []:
-            self.entrylist=[html.HtmlElement()]
+            self.entrylist = [html.HtmlElement()]
             self.entrylist[0].text = self.title + '\n' + self.subtitle
         #为使得第i个索引指向第i个义项，需要添加一个dummy0号义项在entrylist里
         self.entrylist = [html.HtmlElement()] + self.entrylist
@@ -165,7 +183,9 @@ class Baike():
         #为能返回正确的url，对其他url添加头部
         for i in range(len(self.entrylist)):
             if self.entrylist[i].attrib.has_key('href'):
-                self.entrylist[i].attrib['href'] = "https://baike.baidu.com" + self.entrylist[i].attrib['href']
+                self.entrylist[i].attrib[
+                    'href'] = "https://baike.baidu.com" + self.entrylist[
+                        i].attrib['href']
             else:
                 #没有href属性的是当前义项，为它加一个url
                 self.entrylist[i].attrib['href'] = url
@@ -176,20 +196,21 @@ class Baike():
             self.__setup['no'] = [self.__setup['no'], [0]]
         #获取第no[0]号义项的内容
         if self.__setup['no'][0] != 0:
-            return self.__getParagraph(self.entrylist[self.__regularize(self.__setup['no'][0],len(self.entrylist))].attrib['href'])
+            return self.__getParagraph(self.entrylist[self.__regularize(
+                self.__setup['no'][0], len(self.entrylist))].attrib['href'])
         elif self.__setup['no'][0] == 0:
             #如果no[0]是0那么说明要求显示义项列表
             entries = ''
-            self.title=self.__setup['keyword']
-            for i in range(1,len(self.entrylist)):
-                entries += str(i)+':'+self.entrylist[i].text+'\n'
+            self.title = self.__setup['keyword']
+            for i in range(1, len(self.entrylist)):
+                entries += str(i) + ':' + self.entrylist[i].text + '\n'
 
             #处理完毕，拼接结果
-            return self.title+'\n'+entries
+            return self.title + '\n' + entries
 
     def __call__(self, *args, **kwargs):
         ret = self.setting(*args, **kwargs)
-        if ret==0:
+        if ret == 0:
             return self.query()
         else:
             return ''
@@ -205,16 +226,21 @@ class Baike():
 
         # 获取搜索结果
         try:
-            ret = rq.get('https://baike.baidu.com/search?word=' + self.__setup['keyword'],headers=self.__header,timeout=self.__setup['timeout'])
+            ret = rq.get('https://baike.baidu.com/search?word=' +
+                         self.__setup['keyword'],
+                         headers=self.__header,
+                         timeout=self.__setup['timeout'])
         except rq.exceptions.Timeout:
-            stderr.write('超时错误:' + 'https://baike.baidu.com/search?word=' + self.__setup['keyword'] + ';'+'HTTP状态码:'+str(ret.status_code)+'\n')
+            stderr.write('超时错误:' + 'https://baike.baidu.com/search?word=' +
+                         self.__setup['keyword'] + ';' + 'HTTP状态码:' +
+                         str(ret.status_code) + '\n')
             return ''
-        ret.encoding='utf-8'
+        ret.encoding = 'utf-8'
         doc = html.fromstring(ret.text)
         x = "//div[@class='searchResult']/dl[1]/dd[1]/a[@class='result-title']"
         ans = doc.xpath(x)
         if ans == []:
-            stderr.write('没有匹配的搜索结果:'+self.__setup['keyword']+'\n')
+            stderr.write('没有匹配的搜索结果:' + self.__setup['keyword'] + '\n')
             return ''
         url = ans[0].attrib['href']
         if url[0] == '/':
@@ -222,7 +248,7 @@ class Baike():
 
         return self.__getEntries(url)
 
-    def setting(self,*args,**kwargs):
+    def setting(self, *args, **kwargs):
         '''
         设置搜索关键字和header。
 
@@ -248,17 +274,19 @@ class Baike():
         self.__setup.update(kwargs)
         #检查各变量是否合法
         #keyword
-        if not isinstance(self.__setup['keyword'],str):
+        if not isinstance(self.__setup['keyword'], str):
             stderr.write('参数不正确:keyword必须是字符串\n')
             return 1
 
         #no
-        if not ((isinstance(self.__setup['no'], int) or
-            (isinstance(self.__setup['no'], List) and
-            (len(self.__setup['no'])==2) and
-            (isinstance(self.__setup['no'][0], int)) and
-            (isinstance(self.__setup['no'][1], List))and
-            ([i for i in self.__setup['no'][1] if not isinstance(i, int)] == [])))):
+        if not (
+            (isinstance(self.__setup['no'], int) or
+             (isinstance(self.__setup['no'], List) and
+              (len(self.__setup['no']) == 2) and
+              (isinstance(self.__setup['no'][0], int)) and
+              (isinstance(self.__setup['no'][1], List)) and
+              ([i for i in self.__setup['no'][1] if not isinstance(i, int)]
+               == [])))):
 
             stderr.write('参数不正确:no必须是整数或描述段落的列表\n')
             return 2
@@ -268,20 +296,21 @@ class Baike():
             stderr.write('参数不正确:timeout必须大于0\n')
             return 3
 
-
         #pic
-        if not isinstance(self.__setup['pic'],bool):
+        if not isinstance(self.__setup['pic'], bool):
             stderr.write('参数不正确:pic必须是True或False\n')
             return 4
         #自动获取部分
         #header
         #暂时使用Firefox的header
         self.__header = {
-                'Host': 'baike.baidu.com',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0',
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-                'Accept-Encoding': 'gzip, deflate'
+            'Host': 'baike.baidu.com',
+            'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept-Language':
+            'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+            'Accept-Encoding': 'gzip, deflate'
         }
         self.title = ''
 
@@ -294,12 +323,15 @@ class Baike():
     def reset(self):
         self.__setup = {
             'keyword': '',
-            'no': [1,[0]],
+            'no': [1, [0]],
             'timeout': 5,
-            'pic':False
-            }
+            'pic': False
+        }
 
 
 #提供一个预先定义好的对象getBaike方便直接调用
 def getBaike(*args, **kwargs):
-    return Baike()(*args,**kwargs)
+    return Baike()(*args, **kwargs)
+
+
+#print(getBaike("D-A反应"))

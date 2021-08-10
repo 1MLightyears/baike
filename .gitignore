@@ -2,6 +2,9 @@
 *.swp
 *.sh
 baike/*.jpg
+baike/*.png
+*.jpg
+*.png
 
 __pycache__/
 *.egg-info/
