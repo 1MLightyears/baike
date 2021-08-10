@@ -23,8 +23,7 @@ for i in range(tot):
         f"{test_words[i].get('desc','测试')}:{test_words[i].get('args')[0]}({i+1}/{tot})\n"
     )
     try:
-        print(
-            getBaike(*test_words[i].get("args", []), **test_words[i]) + "\n\n")
+        print(getBaike(*test_words[i].get("args", []), **test_words[i]) + "\n\n")
     except Exception as e:
         print("*" * 12)
         print(f"错误:{i+1}/{tot}")
