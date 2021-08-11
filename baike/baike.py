@@ -2,6 +2,7 @@ import re
 from sys import stderr
 from typing import List
 from os.path import exists
+import time
 
 import requests as rq
 from lxml import html
@@ -51,7 +52,7 @@ class Baike:
         url = re.search(r"^(.*?)\?", url).group(1)
         try:
             ir = rq.get(url, stream=True)
-            pic_path = self.title + "_" + str(self.__setup["no"][0]) + ".jpg"
+            pic_path = f"{self.__setup['keyword']}_{str(self.__setup['no'][0])}_{time.strftime('%Y%m%d%H%M%S',time.localtime())}.jpg"
             if not exists(pic_path):
                 if ir.status_code == 200:
                     with open(pic_path, "wb") as f:  # 默认图片为jpg格式
@@ -92,7 +93,6 @@ class Baike:
             for item in index:
                 self.text += item.text_content() + endl
 
-        print(self.__setup)
         # 处理词条文本，分成段落
         para_list = []
         # 某些带头部海报的页面，简介单独放置，因此需要单独选出
@@ -340,6 +340,3 @@ class Baike:
 # 提供一个预先定义好的对象getBaike方便直接调用
 def getBaike(*args, **kwargs):
     return Baike()(*args, **kwargs)
-
-
-# print(getBaike("D-A反应"))

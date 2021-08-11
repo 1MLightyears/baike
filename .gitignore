@@ -7,5 +7,6 @@ baike/*.png
 *.png
 
 __pycache__/
+dist/
 *.egg-info/
 build/

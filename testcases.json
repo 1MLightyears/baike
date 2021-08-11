@@ -35,7 +35,7 @@
     {
         "desc":"测试存图",
         "args":["爱丽丝"],
-        "savepic":true
+        "pic":true
     },
     {
         "desc":"测试有banner的条目",
